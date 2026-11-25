@@ -1,0 +1,32 @@
+{
+  "name": "app-edin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json",
+    "build": "vue-tsc --noEmit -p tsconfig.app.json && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "@primeuix/themes": "^2.0.3",
+    "dexie": "^4.4.7",
+    "pinia": "^4.1.0",
+    "primeicons": "^8.0.2",
+    "primevue": "^4.5.5",
+    "qrcode": "^1.5.4",
+    "vue": "^3.5.46",
+    "vue-router": "^5.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.10",
+    "@types/qrcode": "^1.5.6",
+    "@vitejs/plugin-vue": "^6.0.11",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0",
+    "vue-tsc": "^3.3.14"
+  }
+}
