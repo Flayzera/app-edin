@@ -7,8 +7,9 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import CategorySelect from '../components/CategorySelect.vue'
+import ProductSales from '../components/ProductSales.vue'
 import { useBarStore } from '../stores/bar'
-import { formatCents, parseQty, parseReais } from '../money'
+import { formatCents, formatTodayLabel, parseQty, parseReais, startOfToday } from '../money'
 import { reasonLabel } from '../labels'
 import ScreenHeader from '../components/ScreenHeader.vue'
 import type { Product } from '../types'
@@ -45,6 +46,16 @@ const grouped = computed(() => {
 const editing = computed(() => (editingId.value ? bar.productById(editingId.value) : null))
 const selected = computed(() => (selectedId.value ? bar.productById(selectedId.value) : null))
 const lowCount = computed(() => bar.lowStockProducts.length)
+const salesDay = ref(new Date())
+const salesDayLabel = computed(() => formatTodayLabel(salesDay.value))
+const salesIsToday = computed(() => startOfToday(salesDay.value) === startOfToday())
+
+function shiftSalesDay(delta: number) {
+  const next = new Date(salesDay.value)
+  next.setDate(next.getDate() + delta)
+  if (startOfToday(next) > startOfToday()) return
+  salesDay.value = next
+}
 
 function isLow(product: Product) {
   return product.lowStockAt !== null && product.stockQty <= product.lowStockAt
@@ -142,7 +153,7 @@ async function archive(product: Product) {
 async function remove(product: Product) {
   const ok = await bar.ask(
     'Apagar produto',
-    `Apagar ${product.name}? Ele sai do estoque. As vendas já lançadas em Hoje continuam.`,
+    `Apagar ${product.name}? Ele sai do estoque. As vendas já registradas no caixa continuam.`,
     'Apagar',
   )
   if (ok) await bar.deleteProduct(product.id)
@@ -205,6 +216,14 @@ async function remove(product: Product) {
     </form>
 
     <template v-else>
+      <div v-if="grouped.length || archived.length" class="day-nav">
+        <Button icon="pi pi-chevron-left" severity="secondary" text rounded aria-label="Dia anterior" @click="shiftSalesDay(-1)" />
+        <div>
+          <p class="kicker">Vendas pagas</p>
+          <p>{{ salesDayLabel }}</p>
+        </div>
+        <Button icon="pi pi-chevron-right" severity="secondary" text rounded aria-label="Próximo dia" :disabled="salesIsToday" @click="shiftSalesDay(1)" />
+      </div>
       <Message v-if="lowCount" severity="warn" :closable="false">
         {{ lowCount === 1 ? '1 produto no limite' : `${lowCount} produtos no limite` }}
       </Message>
@@ -225,6 +244,7 @@ async function remove(product: Product) {
                 <Tag v-if="isLow(product)" value="Baixo" severity="warn" rounded />
               </div>
               <p v-if="movementText(product.id)" class="movement">{{ movementText(product.id) }}</p>
+              <ProductSales :product-id="product.id" :day="salesDay" />
               <div class="actions" style="margin-top: 0.75rem">
                 <Button label="Entrada" icon="pi pi-plus" @click="openMovement(product, 'in')" />
                 <Button label="Ajuste" icon="pi pi-sliders-h" severity="secondary" outlined @click="openMovement(product, 'adjust')" />
@@ -248,6 +268,7 @@ async function remove(product: Product) {
                 <strong>{{ product.name }}</strong>
                 <span class="muted">{{ product.stockQty }}</span>
               </div>
+              <ProductSales :product-id="product.id" :day="salesDay" />
               <div class="actions" style="margin-top: 0.75rem">
                 <Button label="Reativar" severity="secondary" outlined @click="bar.setProductActive(product.id, true)" />
                 <Button label="Apagar" icon="pi pi-trash" severity="danger" text @click="remove(product)" />

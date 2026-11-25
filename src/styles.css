@@ -189,6 +189,67 @@ h1 {
 .qty { font-size: 2rem; font-weight: 700; line-height: 1; }
 .movement { margin-top: 0.25rem; color: var(--p-text-muted-color); font-size: 0.85rem; }
 
+.day-nav {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.day-nav .kicker { margin-bottom: 0; }
+.day-nav p:last-child { font-weight: 700; }
+
+.sales-panel.p-panel {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sales-panel .p-panel-header,
+.sales-panel .p-panel-content {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.sales-panel .p-panel-header-actions { flex: 1; width: 100%; }
+
+.sales-summary {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.55rem;
+  align-items: center;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.45rem 0;
+  border: 0;
+  border-top: 1px solid var(--p-content-border-color);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sales-summary span { color: var(--p-text-muted-color); font-size: 0.88rem; font-weight: 650; }
+.sales-summary strong { font-variant-numeric: tabular-nums; }
+
+.sale-scroll { max-height: 14rem; overflow: auto; }
+
+.sale-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: baseline;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--p-content-border-color);
+  font-size: 0.88rem;
+}
+
+.sale-line span:nth-child(2) { min-width: 0; }
+.sale-line strong { font-variant-numeric: tabular-nums; }
+
 .dock {
   position: fixed;
   z-index: 5;
@@ -311,8 +372,8 @@ h1 {
 
 .pay-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.65rem;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
   margin-top: 1rem;
 }
 
@@ -325,7 +386,7 @@ h1 {
 
 .actions > .p-inputtext { width: 100%; min-width: 0; }
 
-.pix-amount {
+.pay-amount {
   margin: 0.75rem 0 0.15rem;
   font-size: 2rem;
   font-weight: 700;

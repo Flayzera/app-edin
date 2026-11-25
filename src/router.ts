@@ -10,7 +10,8 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'mesas', component: TablesView },
     { path: '/mesa/:tableId', name: 'comanda', component: ComandaView },
-    { path: '/hoje', name: 'hoje', component: TodayView },
+    { path: '/caixa', name: 'caixa', component: TodayView },
+    { path: '/hoje', redirect: '/caixa' },
     { path: '/estoque', name: 'estoque', component: StockView },
     { path: '/cardapio', redirect: '/estoque' },
     { path: '/ajustes', name: 'ajustes', component: SettingsView },

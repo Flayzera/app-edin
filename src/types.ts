@@ -1,4 +1,4 @@
-export type PaymentMethod = 'cash' | 'pix'
+export type PaymentMethod = 'cash' | 'pix' | 'card'
 
 export type ItemStatus = 'open' | 'paid' | 'cancelled'
 
@@ -74,10 +74,21 @@ export interface AuditEntry {
   detail: string
 }
 
-export interface PixProfile {
-  key: string
-  name: string
-  city: string
+export interface CashSession {
+  id: string
+  openedAt: number
+  closedAt: number | null
+  status: 'open' | 'closed'
+  openingCents: number
+  closingExpectedCents: number | null
+}
+
+export interface CashDrop {
+  id: string
+  sessionId: string
+  amountCents: number
+  note: string
+  createdAt: number
 }
 
 export interface BackupFile {
@@ -90,7 +101,8 @@ export interface BackupFile {
   payments: Payment[]
   movements: StockMovement[]
   audits: AuditEntry[]
-  pix?: PixProfile | null
+  sessions: CashSession[]
+  drops: CashDrop[]
 }
 
 export interface ProductDraft {

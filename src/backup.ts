@@ -1,19 +1,19 @@
-import { isReadyPix } from './pix'
 import type {
   BackupFile,
   BarTable,
+  CashDrop,
+  CashSession,
   Comanda,
   ComandaItem,
   AuditEntry,
   Payment,
-  PixProfile,
   Product,
   StockMovement,
 } from './types'
 
 const itemStatuses = new Set(['open', 'paid', 'cancelled'])
 const comandaStatuses = new Set(['open', 'closed'])
-const methods = new Set(['cash', 'pix'])
+const methods = new Set(['cash', 'pix', 'card'])
 const reasons = new Set(['purchase', 'sale', 'cancel', 'adjustment'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -108,6 +108,27 @@ function validAudit(value: unknown): value is AuditEntry {
   )
 }
 
+function validSession(value: unknown): value is CashSession {
+  if (!isRecord(value)) return false
+  const open = value.status === 'open' && value.closedAt === null && value.closingExpectedCents === null
+  const closed =
+    value.status === 'closed' &&
+    isInt(value.closedAt, 0, 9_999_999_999_999) &&
+    isInt(value.closingExpectedCents, 0, 100_000_000)
+  return isId(value.id) && isInt(value.openedAt, 0, 9_999_999_999_999) && isInt(value.openingCents, 0, 100_000_000) && (open || closed)
+}
+
+function validDrop(value: unknown): value is CashDrop {
+  if (!isRecord(value)) return false
+  return (
+    isId(value.id) &&
+    isId(value.sessionId) &&
+    isInt(value.amountCents, 1, 100_000_000) &&
+    isText(value.note, 80) &&
+    isInt(value.createdAt, 0, 9_999_999_999_999)
+  )
+}
+
 function validMovement(value: unknown): value is StockMovement {
   if (!isRecord(value)) return false
   return (
@@ -143,11 +164,12 @@ export function parseBackup(value: unknown): BackupFile | null {
   const audits = Array.isArray(value.audits) ? (value.audits as unknown[]) : []
   if (!audits.every(validAudit)) return null
   if (!unique(audits.map((row) => (row as AuditEntry).id))) return null
-  let pix: PixProfile | null = null
-  if (value.pix !== undefined) {
-    if (!isReadyPix(value.pix)) return null
-    pix = value.pix
-  }
+  const sessions = Array.isArray(value.sessions) ? (value.sessions as unknown[]) : []
+  const drops = Array.isArray(value.drops) ? (value.drops as unknown[]) : []
+  if (!sessions.every(validSession) || !drops.every(validDrop)) return null
+  if (!unique(sessions.map((row) => (row as CashSession).id))) return null
+  if (!unique(drops.map((row) => (row as CashDrop).id))) return null
+  if (sessions.filter((row) => (row as CashSession).status === 'open').length > 1) return null
 
   const productIds = products.map((row) => (row as Product).id)
   const comandaIdList = comandas.map((row) => (row as Comanda).id)
@@ -158,6 +180,11 @@ export function parseBackup(value: unknown): BackupFile | null {
   const itemIds = new Set(itemIdList)
   if (!unique(payments.map((row) => (row as Payment).id))) return null
   if (!unique(movements.map((row) => (row as StockMovement).id))) return null
+
+  const sessionIds = new Set(sessions.map((row) => (row as CashSession).id))
+  for (const drop of drops as CashDrop[]) {
+    if (!sessionIds.has(drop.sessionId)) return null
+  }
 
   const productSet = new Set(productIds)
   for (const item of items as ComandaItem[]) {
@@ -181,6 +208,7 @@ export function parseBackup(value: unknown): BackupFile | null {
     payments: payments as Payment[],
     movements: movements as StockMovement[],
     audits: audits as AuditEntry[],
-    pix,
+    sessions: sessions as CashSession[],
+    drops: drops as CashDrop[],
   }
 }

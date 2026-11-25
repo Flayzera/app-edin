@@ -1,6 +1,7 @@
 export const methodLabel = {
   cash: 'Dinheiro',
   pix: 'Pix',
+  card: 'Cartão',
 } as const
 
 export const reasonLabel = {

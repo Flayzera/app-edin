@@ -7,7 +7,7 @@ const router = useRouter()
 
 const items = [
   { to: '/', label: 'Mesas', icon: 'pi pi-th-large', names: ['mesas', 'comanda'] },
-  { to: '/hoje', label: 'Hoje', icon: 'pi pi-wallet', names: ['hoje'] },
+  { to: '/caixa', label: 'Caixa', icon: 'pi pi-wallet', names: ['caixa'] },
   { to: '/estoque', label: 'Estoque', icon: 'pi pi-box', names: ['estoque'] },
   { to: '/ajustes', label: 'Ajustes', icon: 'pi pi-cog', names: ['ajustes'] },
 ]
