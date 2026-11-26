@@ -99,41 +99,44 @@ async function onPaid(result: 'partial' | 'closed') {
       <h1>{{ table?.name ?? 'Mesa' }}</h1>
     </header>
 
-    <ItemList
-      v-if="comanda"
-      :open-items="openItems"
-      :paid-items="paidItems"
-      :cancelled-items="cancelledItems"
-      @increase="increase"
-      @decrease="decrease"
-    />
+    <div v-if="comanda" class="comanda-layout">
+      <div>
+        <ItemList
+          :open-items="openItems"
+          :paid-items="paidItems"
+          :cancelled-items="cancelledItems"
+          @increase="increase"
+          @decrease="decrease"
+        />
 
-    <section v-if="shares.length" class="list">
-      <p class="section-label">Quem pagou</p>
-      <Card v-for="payment in shares" :key="payment.id">
-        <template #content>
-          <div class="row-between">
-            <strong>{{ payment.payerName }}</strong>
-            <span>{{ formatCents(payment.amountCents) }}</span>
-          </div>
-          <p class="movement">{{ methodLabel[payment.method] }}</p>
-        </template>
-      </Card>
-    </section>
+        <section v-if="shares.length" class="list">
+          <p class="section-label">Quem pagou</p>
+          <Card v-for="payment in shares" :key="payment.id">
+            <template #content>
+              <div class="row-between">
+                <strong>{{ payment.payerName }}</strong>
+                <span>{{ formatCents(payment.amountCents) }}</span>
+              </div>
+              <p class="movement">{{ methodLabel[payment.method] }}</p>
+            </template>
+          </Card>
+        </section>
+      </div>
+
+      <footer class="dock">
+        <div class="totals">
+          <div class="total-line"><span>Consumo</span><span>{{ formatCents(consumption) }}</span></div>
+          <div class="total-line"><span>Já pago</span><span>{{ formatCents(paid) }}</span></div>
+          <div class="total-line strong"><span>Em aberto</span><span class="amount">{{ formatCents(due) }}</span></div>
+        </div>
+        <div class="actions">
+          <Button label="Adicionar" icon="pi pi-plus" severity="secondary" outlined @click="pickerOpen = true" />
+          <Button v-if="due > 0" label="Pagar" icon="pi pi-wallet" @click="payOpen = true" />
+          <Button v-else label="Fechar mesa" icon="pi pi-check" :disabled="bar.busy" @click="liberar" />
+        </div>
+      </footer>
+    </div>
   </main>
-
-  <footer v-if="comanda" class="dock">
-    <div class="totals">
-      <div class="total-line"><span>Consumo</span><span>{{ formatCents(consumption) }}</span></div>
-      <div class="total-line"><span>Já pago</span><span>{{ formatCents(paid) }}</span></div>
-      <div class="total-line strong"><span>Em aberto</span><span class="amount">{{ formatCents(due) }}</span></div>
-    </div>
-    <div class="actions">
-      <Button label="Adicionar" icon="pi pi-plus" severity="secondary" outlined @click="pickerOpen = true" />
-      <Button v-if="due > 0" label="Pagar" icon="pi pi-wallet" @click="payOpen = true" />
-      <Button v-else label="Fechar mesa" icon="pi pi-check" :disabled="bar.busy" @click="liberar" />
-    </div>
-  </footer>
 
   <ProductPicker v-if="pickerOpen && comanda" :comanda-id="comanda.id" @close="pickerOpen = false" />
   <PaySheet v-if="payOpen && comanda" :comanda-id="comanda.id" @close="payOpen = false" @done="onPaid" />

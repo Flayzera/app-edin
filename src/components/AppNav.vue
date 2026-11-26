@@ -15,6 +15,7 @@ const items = [
 
 <template>
   <nav class="nav" aria-label="Seções">
+    <p class="nav-brand">Balcão</p>
     <Button
       v-for="item in items"
       :key="item.to"

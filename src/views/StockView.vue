@@ -232,7 +232,7 @@ async function remove(product: Product) {
       </Message>
       <section v-for="[category, products] in grouped" :key="category">
         <p class="section-label">{{ category }}</p>
-        <div class="list">
+        <div class="list catalog">
           <Card v-for="product in products" :key="product.id" :class="{ 'low-card': isLow(product) }">
             <template #content>
               <div class="row-between">
@@ -261,7 +261,7 @@ async function remove(product: Product) {
 
       <section v-if="archived.length">
         <p class="section-label">Arquivados</p>
-        <div class="list">
+        <div class="list catalog">
           <Card v-for="product in archived" :key="product.id">
             <template #content>
               <div class="row-between">

@@ -97,6 +97,8 @@ async function close() {
   <main class="screen">
     <ScreenHeader eyebrow="Movimento" title="Caixa" :subtitle="`${periodLabel}. Vendas do período e o dinheiro da gaveta.`" />
 
+    <div class="caixa-layout">
+    <div>
     <Card v-if="session && position">
       <template #content>
         <div class="row-between">
@@ -144,8 +146,10 @@ async function close() {
         <Button class="wide-btn" style="margin-top: 0.85rem" label="Abrir caixa" icon="pi pi-lock-open" :disabled="bar.busy" @click="open" />
       </template>
     </Card>
+    </div>
 
-    <div class="stack" style="margin-top: 1rem">
+    <div>
+    <div class="stack">
       <SelectButton v-model="kind" class="mode-switch" :options="kinds" optionLabel="label" optionValue="value" :allowEmpty="false" />
       <DatePicker v-model="anchor" :view="pickerView" :dateFormat="dateFormat" :manualInput="false" showIcon fluid iconDisplay="input" />
     </div>
@@ -190,6 +194,8 @@ async function close() {
           <p class="movement">{{ row.detail }}</p>
         </template>
       </Card>
+    </div>
+    </div>
     </div>
   </main>
 </template>

@@ -37,12 +37,14 @@ async function onFile(event: Event) {
       subtitle="Os dados ficam neste celular. O registro mostra o que aconteceu, na ordem."
     />
 
+    <div class="settings-layout">
     <div class="stack">
       <Button class="wide-btn" label="Exportar JSON" icon="pi pi-download" severity="secondary" outlined @click="bar.exportBackup()" />
       <Button class="wide-btn" label="Importar JSON" icon="pi pi-upload" severity="secondary" outlined @click="pickFile" />
       <input ref="fileInput" hidden type="file" accept="application/json,.json" @change="onFile" />
     </div>
 
+    <div>
     <p class="section-label">Registro</p>
     <Message v-if="bar.audits.length === 0" severity="secondary" :closable="false" icon="pi pi-list">
       Nenhuma ação registrada ainda.
@@ -60,5 +62,7 @@ async function onFile(event: Event) {
         </Card>
       </template>
     </Timeline>
+    </div>
+    </div>
   </main>
 </template>

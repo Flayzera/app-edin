@@ -25,10 +25,12 @@ watch(notice, (message) => {
     <ProgressSpinner style="width: 2.5rem; height: 2.5rem" strokeWidth="4" />
     <span>Abrindo o balcão…</span>
   </div>
-  <template v-else>
-    <RouterView />
+  <div v-else class="shell">
     <AppNav />
-  </template>
+    <div class="shell-main">
+      <RouterView />
+    </div>
+  </div>
   <Toast position="top-center" />
   <Dialog
     :visible="dialog !== null"
