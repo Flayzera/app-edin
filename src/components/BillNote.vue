@@ -21,6 +21,15 @@ const payments = computed(() =>
 const consumption = computed(() => bar.consumptionOf(props.comanda.id))
 const paid = computed(() => bar.paidOf(props.comanda.id))
 const due = computed(() => Math.max(0, bar.dueOf(props.comanda.id)))
+const stay = computed(() => {
+  const end = props.comanda.closedAt ?? Date.now()
+  const totalSeconds = Math.max(0, Math.floor((end - props.comanda.openedAt) / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const part = (value: number) => String(value).padStart(2, '0')
+  return `${part(hours)}:${part(minutes)}:${part(seconds)}`
+})
 
 function amount(cents: number) {
   return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -39,6 +48,7 @@ function amount(cents: number) {
       <div><dt>Mesa</dt><dd>{{ comanda.tableName }}</dd></div>
       <div><dt>Abertura</dt><dd>{{ formatDateTime(comanda.openedAt) }}</dd></div>
       <div v-if="comanda.closedAt"><dt>Fechamento</dt><dd>{{ formatDateTime(comanda.closedAt) }}</dd></div>
+      <div><dt>Permanência</dt><dd>{{ stay }}</dd></div>
     </dl>
 
     <table>
