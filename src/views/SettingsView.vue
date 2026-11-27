@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Message from 'primevue/message'
+import Paginator from 'primevue/paginator'
 import Timeline from 'primevue/timeline'
 import { useBarStore } from '../stores/bar'
 import { formatDateTime } from '../money'
@@ -10,6 +11,18 @@ import ScreenHeader from '../components/ScreenHeader.vue'
 
 const bar = useBarStore()
 const fileInput = ref<HTMLInputElement | null>(null)
+const pageSize = 10
+const first = ref(0)
+const pageRows = computed(() => bar.audits.slice(first.value, first.value + pageSize))
+
+watch(
+  () => bar.audits.length,
+  (count) => {
+    if (first.value > 0 && first.value >= count) {
+      first.value = Math.max(0, Math.floor((Math.max(count, 1) - 1) / pageSize) * pageSize)
+    }
+  },
+)
 
 function pickFile() {
   fileInput.value?.click()
@@ -22,7 +35,7 @@ async function onFile(event: Event) {
   if (!file) return
   const ok = await bar.ask(
     'Substituir dados',
-    'Isso apaga mesas, contas, produtos, estoque, o caixa e o registro deste celular e coloca o que está no arquivo.',
+    'Isso apaga mesas, contas, produtos, estoque, o caixa, os fiados e o registro deste celular e coloca o que está no arquivo.',
     'Substituir',
   )
   if (ok) await bar.importBackup(file)
@@ -49,7 +62,7 @@ async function onFile(event: Event) {
     <Message v-if="bar.audits.length === 0" severity="secondary" :closable="false" icon="pi pi-list">
       Nenhuma ação registrada ainda.
     </Message>
-    <Timeline v-else :value="bar.audits" align="left" class="audit">
+    <Timeline v-else :value="pageRows" align="left" class="audit">
       <template #content="{ item }">
         <Card>
           <template #content>
@@ -62,6 +75,15 @@ async function onFile(event: Event) {
         </Card>
       </template>
     </Timeline>
+    <Paginator
+      v-model:first="first"
+      class="pager"
+      :rows="pageSize"
+      :totalRecords="bar.audits.length"
+      :alwaysShow="true"
+      template="PrevPageLink CurrentPageReport NextPageLink"
+      currentPageReportTemplate="{first}–{last} de {totalRecords}"
+    />
     </div>
     </div>
   </main>

@@ -28,7 +28,7 @@ const paidItems = computed(() => (comanda.value ? bar.itemsOf(comanda.value.id, 
 const cancelledItems = computed(() => (comanda.value ? bar.itemsOf(comanda.value.id, 'cancelled') : []))
 const shares = computed(() =>
   comanda.value
-    ? bar.payments.filter((payment) => payment.comandaId === comanda.value?.id && payment.payerName)
+    ? bar.payments.filter((payment) => payment.comandaId === comanda.value?.id && payment.payerName && !payment.debtId)
     : [],
 )
 

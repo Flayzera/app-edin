@@ -68,7 +68,16 @@ async function add(productId: string) {
 
 <template>
   <Sheet title="Adicionar" @close="emit('close')">
-    <Select v-if="categories.length > 1" v-model="category" :options="categories" fluid />
+    <Select
+      v-if="categories.length > 1"
+      v-model="category"
+      :options="categories"
+      filter
+      filterPlaceholder="Buscar categoria"
+      emptyFilterMessage="Nenhuma categoria"
+      resetFilterOnHide
+      fluid
+    />
     <div v-if="visible.length === 0" class="stack">
       <Message severity="secondary" :closable="false" icon="pi pi-box">Nenhum produto no estoque.</Message>
       <Button label="Cadastrar no estoque" icon="pi pi-plus" severity="secondary" outlined @click="emit('close'); $router.push('/estoque')" />

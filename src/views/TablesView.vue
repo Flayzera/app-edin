@@ -6,6 +6,7 @@ import FloatLabel from 'primevue/floatlabel'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { useBarStore } from '../stores/bar'
+import ClosedTables from '../components/ClosedTables.vue'
 import ScreenHeader from '../components/ScreenHeader.vue'
 import TableCard from '../components/TableCard.vue'
 
@@ -46,7 +47,7 @@ async function create() {
     <ScreenHeader
       eyebrow="Balcão"
       title="Mesas"
-      subtitle="Abra uma mesa quando alguém sentar. Ao fechar, ela sai da lista."
+      subtitle="Abra uma mesa quando alguém sentar. As fechadas ficam embaixo."
     >
       <Button v-if="!creating" label="Abrir mesa" icon="pi pi-plus" @click="start" />
     </ScreenHeader>
@@ -75,5 +76,6 @@ async function create() {
         @click="router.push({ name: 'comanda', params: { tableId: card.table.id } })"
       />
     </div>
+    <ClosedTables />
   </main>
 </template>

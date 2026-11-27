@@ -40,7 +40,14 @@ watch(notice, (message) => {
     :style="{ width: 'min(26rem, calc(100vw - 2rem))' }"
     @update:visible="(open) => { if (!open) bar.answer(false) }"
   >
-    <p class="subtitle">{{ dialog?.body }}</p>
+    <p v-if="dialog?.body" class="subtitle">{{ dialog.body }}</p>
+    <div v-if="dialog?.lines?.length" class="confirm-lines">
+      <div v-for="(line, index) in dialog.lines" :key="index" class="total-line" :class="{ strong: line.strong }">
+        <span>{{ line.label }}</span>
+        <span :class="{ amount: line.strong }">{{ line.value }}</span>
+      </div>
+    </div>
+    <p v-if="dialog?.note" class="hint confirm-note">{{ dialog.note }}</p>
     <template #footer>
       <Button label="Cancelar" severity="secondary" text @click="bar.answer(false)" />
       <Button :label="dialog?.confirmLabel ?? 'Confirmar'" severity="danger" @click="bar.answer(true)" />

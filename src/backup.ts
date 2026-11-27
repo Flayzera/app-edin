@@ -6,6 +6,7 @@ import type {
   Comanda,
   ComandaItem,
   AuditEntry,
+  Debt,
   Payment,
   Product,
   StockMovement,
@@ -13,7 +14,7 @@ import type {
 
 const itemStatuses = new Set(['open', 'paid', 'cancelled'])
 const comandaStatuses = new Set(['open', 'closed'])
-const methods = new Set(['cash', 'pix', 'card'])
+const methods = new Set(['cash', 'pix', 'card', 'fiado'])
 const reasons = new Set(['purchase', 'sale', 'cancel', 'adjustment'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -88,6 +89,9 @@ function validPayment(value: unknown): value is Payment {
   const payerName = value.payerName === undefined ? '' : value.payerName
   if (!isText(payerName, 40)) return false
   value.payerName = payerName
+  const debtId = value.debtId === undefined || value.debtId === '' ? '' : value.debtId
+  if (typeof debtId !== 'string' || (debtId !== '' && !isId(debtId))) return false
+  value.debtId = debtId
   return (
     isId(value.id) &&
     isId(value.comandaId) &&
@@ -116,6 +120,25 @@ function validSession(value: unknown): value is CashSession {
     isInt(value.closedAt, 0, 9_999_999_999_999) &&
     isInt(value.closingExpectedCents, 0, 100_000_000)
   return isId(value.id) && isInt(value.openedAt, 0, 9_999_999_999_999) && isInt(value.openingCents, 0, 100_000_000) && (open || closed)
+}
+
+function validDebt(value: unknown): value is Debt {
+  if (!isRecord(value)) return false
+  const open = value.status === 'open' && value.paidAt === null && isInt(value.remainingCents, 1, 100_000_000)
+  const paid = value.status === 'paid' && isInt(value.paidAt, 0, 9_999_999_999_999) && value.remainingCents === 0
+  return (
+    isId(value.id) &&
+    isText(value.personName, 40) &&
+    value.personName.trim().length > 0 &&
+    isId(value.comandaId) &&
+    isText(value.tableName, 24) &&
+    isText(value.detail, 160) &&
+    isInt(value.originalCents, 1, 100_000_000) &&
+    isInt(value.remainingCents, 0, 100_000_000) &&
+    value.remainingCents <= value.originalCents &&
+    isInt(value.createdAt, 0, 9_999_999_999_999) &&
+    (open || paid)
+  )
 }
 
 function validDrop(value: unknown): value is CashDrop {
@@ -166,10 +189,17 @@ export function parseBackup(value: unknown): BackupFile | null {
   if (!unique(audits.map((row) => (row as AuditEntry).id))) return null
   const sessions = Array.isArray(value.sessions) ? (value.sessions as unknown[]) : []
   const drops = Array.isArray(value.drops) ? (value.drops as unknown[]) : []
-  if (!sessions.every(validSession) || !drops.every(validDrop)) return null
+  const debts = Array.isArray(value.debts) ? (value.debts as unknown[]) : []
+  if (!sessions.every(validSession) || !drops.every(validDrop) || !debts.every(validDebt)) return null
   if (!unique(sessions.map((row) => (row as CashSession).id))) return null
   if (!unique(drops.map((row) => (row as CashDrop).id))) return null
+  if (!unique(debts.map((row) => (row as Debt).id))) return null
   if (sessions.filter((row) => (row as CashSession).status === 'open').length > 1) return null
+  let monthGoalCents: number | null = null
+  if (value.monthGoalCents !== undefined && value.monthGoalCents !== null) {
+    if (!isInt(value.monthGoalCents, 1, 100_000_000)) return null
+    monthGoalCents = value.monthGoalCents
+  }
 
   const productIds = products.map((row) => (row as Product).id)
   const comandaIdList = comandas.map((row) => (row as Comanda).id)
@@ -185,6 +215,10 @@ export function parseBackup(value: unknown): BackupFile | null {
   for (const drop of drops as CashDrop[]) {
     if (!sessionIds.has(drop.sessionId)) return null
   }
+  const debtIds = new Set(debts.map((row) => (row as Debt).id))
+  for (const debt of debts as Debt[]) {
+    if (!comandaIds.has(debt.comandaId)) return null
+  }
 
   const productSet = new Set(productIds)
   for (const item of items as ComandaItem[]) {
@@ -192,6 +226,7 @@ export function parseBackup(value: unknown): BackupFile | null {
   }
   for (const payment of payments as Payment[]) {
     if (!comandaIds.has(payment.comandaId)) return null
+    if (payment.debtId && !debtIds.has(payment.debtId)) return null
     if (payment.itemIds.some((id) => !itemIds.has(id))) return null
   }
   for (const movement of movements as StockMovement[]) {
@@ -210,5 +245,7 @@ export function parseBackup(value: unknown): BackupFile | null {
     audits: audits as AuditEntry[],
     sessions: sessions as CashSession[],
     drops: drops as CashDrop[],
+    debts: debts as Debt[],
+    monthGoalCents,
   }
 }

@@ -18,12 +18,11 @@ const emit = defineEmits<{
 }>()
 
 const bar = useBarStore()
-const mode = ref<'full' | 'items' | 'amount'>('items')
+const mode = ref<'items' | 'amount'>('items')
 const amountText = ref('')
 const payerName = ref('')
 const picked = reactive<Record<string, number>>({})
 const modes = [
-  { label: 'Cheio', value: 'full' },
   { label: 'Itens', value: 'items' },
   { label: 'Valor', value: 'amount' },
 ]
@@ -44,15 +43,9 @@ const subtotal = computed(() =>
 )
 
 const amountCents = computed(() => parseReais(amountText.value))
-const paying = computed(() => {
-  if (mode.value === 'items') return subtotal.value
-  if (mode.value === 'amount') return amountCents.value ?? 0
-  return due.value
-})
-const needsName = computed(() => mode.value !== 'items')
+const paying = computed(() => (mode.value === 'items' ? subtotal.value : (amountCents.value ?? 0)))
 const canPay = computed(() => {
   if (bar.busy || !bar.openSession || due.value < 1 || paying.value < 1 || paying.value > due.value) return false
-  if (!needsName.value) return true
   const who = payerName.value.trim()
   return who.length > 0 && who.length <= 40
 })
@@ -80,10 +73,15 @@ async function submit(method: PaymentMethod) {
             .filter(([, qty]) => qty > 0)
             .map(([itemId, qty]) => ({ itemId, qty })),
           method,
+          payerName.value,
         )
       : await bar.payAmount(props.comandaId, paying.value, method, payerName.value)
   if (result === 'failed') return
   emit('done', result)
+}
+
+async function submitFiado() {
+  await submit('fiado')
 }
 </script>
 
@@ -93,18 +91,13 @@ async function submit(method: PaymentMethod) {
 
     <SelectButton v-model="mode" class="mode-switch" :options="modes" optionLabel="label" optionValue="value" :allowEmpty="false" />
 
-    <template v-if="mode === 'full'">
-      <p class="hint">Cobra tudo que ainda está em aberto.</p>
-      <p class="pay-amount">{{ formatCents(due) }}</p>
-    </template>
-
-    <template v-else-if="mode === 'items'">
+    <template v-if="mode === 'items'">
       <p class="hint">Marque só o que essa pessoa consumiu.</p>
       <div v-if="openItems.length === 0" class="empty">Não há itens em aberto.</div>
       <div v-else class="stack" style="margin-top: 0.75rem">
         <div v-for="item in openItems" :key="item.id" class="pay-row">
           <label class="check-row">
-            <Checkbox binary :modelValue="Boolean(picked[item.id])" @update:modelValue="setChecked(item.id, item.qty, $event)" />
+            <Checkbox binary :modelValue="Boolean(picked[item.id])" @update:modelValue="setChecked(item.id, 1, $event)" />
             <span>
               <strong>{{ item.name }}</strong>
               <span class="muted" style="display: block">
@@ -134,7 +127,7 @@ async function submit(method: PaymentMethod) {
       <Message v-if="amountInvalid" severity="error" :closable="false">Digite o valor com até duas casas. Ex.: 40,00</Message>
     </template>
 
-    <FloatLabel v-if="needsName" variant="on" class="field" style="margin-top: 0.85rem">
+    <FloatLabel variant="on" class="field" style="margin-top: 0.85rem">
       <InputText id="payer-name" v-model="payerName" maxlength="40" autocomplete="off" />
       <label for="payer-name">Quem pagou</label>
     </FloatLabel>
@@ -149,5 +142,7 @@ async function submit(method: PaymentMethod) {
       <Button label="Pix" severity="success" :disabled="!canPay" @click="submit('pix')" />
       <Button label="Cartão" severity="info" :disabled="!canPay" @click="submit('card')" />
     </div>
+    <Button class="wide-btn fiado-btn" label="Fiado" icon="pi pi-book" severity="warn" outlined :disabled="!canPay" @click="submitFiado" />
+    <p class="hint">O fiado não entra na gaveta. Fica em A receber até a pessoa pagar.</p>
   </Sheet>
 </template>

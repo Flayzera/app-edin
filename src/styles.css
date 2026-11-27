@@ -107,6 +107,23 @@ h1 {
   box-shadow: none;
 }
 
+.table-card.is-closed.p-card {
+  border-color: var(--p-content-border-color);
+  background: var(--p-surface-0);
+}
+
+.closed-block { margin-top: 1.75rem; }
+.closed-tools { margin-top: 0.35rem; }
+.closed-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 1rem 0 0.75rem;
+  font-weight: 700;
+}
+.closed-total span { color: var(--p-text-muted-color); font-size: 0.85rem; font-weight: 650; }
+
 .table-card .p-card-body,
 .p-card .p-card-body { padding: 0.9rem 1rem; }
 .table-card .p-card-content,
@@ -137,6 +154,12 @@ h1 {
 
 .stack { display: grid; gap: 0.9rem; }
 .list { display: grid; gap: 0.75rem; }
+.pager.p-paginator {
+  justify-content: space-between;
+  padding: 0.35rem 0 0;
+  background: transparent;
+  border: 0;
+}
 .field { display: block; width: 100%; }
 .field .p-inputtext { width: 100%; }
 
@@ -298,11 +321,11 @@ h1 {
   flex-direction: column;
   gap: 0.15rem;
   border-radius: 0;
-  padding-inline: 0.15rem;
-  font-size: 0.68rem;
+  padding-inline: 0.1rem;
+  font-size: 0.62rem;
 }
 
-.nav-btn .p-button-label { font-weight: 700; }
+.nav-btn .p-button-label { font-weight: 700; white-space: nowrap; }
 .nav-btn .p-button-icon { font-size: 1.05rem; }
 
 .chips { display: flex; gap: 0.45rem; overflow: auto; padding-bottom: 0.75rem; }
@@ -362,9 +385,68 @@ h1 {
 .stat-total .stat-value { font-size: 1.8rem; letter-spacing: -0.04em; }
 .stat-total .p-card-content > span { color: color-mix(in srgb, var(--p-primary-contrast-color) 78%, transparent); }
 
+.day-bars { display: grid; gap: 0.45rem; }
+.day-bar {
+  display: grid;
+  grid-template-columns: 4.6rem minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.day-bar strong { font-variant-numeric: tabular-nums; }
+.day-track {
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--p-content-border-color);
+}
+.day-track > span {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: var(--p-primary-color);
+}
+.goal-track { display: block; margin: 0.75rem 0 0.35rem; }
+
+.cash-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.55rem;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cash-toggle .movement { display: block; margin-top: 0.15rem; }
+.cash-detail {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--p-content-border-color);
+}
+.cash-detail p { margin: 0; }
+.cash-detail .item-line { color: var(--p-text-muted-color); font-weight: 650; }
+
 .is-muted { opacity: 0.72; }
 .low-card.p-card { border-color: var(--p-orange-300); }
 .audit { margin-top: 0.25rem; }
+
+.confirm-lines {
+  display: grid;
+  gap: 0.55rem;
+}
+.confirm-lines .total-line.strong {
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+.confirm-note { margin: 0.95rem 0 0; }
 
 .table-row {
   display: grid;
@@ -393,6 +475,10 @@ h1 {
 }
 
 .actions > .p-inputtext { width: 100%; min-width: 0; }
+
+.fiado-btn.p-button { margin-top: 0.65rem; }
+.debt-list { display: grid; gap: 0.75rem; }
+.debt-list .section-label { margin-top: 1.25rem; }
 
 .pay-amount {
   margin: 0.75rem 0 0.15rem;
@@ -540,6 +626,16 @@ h2 {
   }
 
   .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  .report-layout {
+    display: grid;
+    grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .report-layout .stats { grid-template-columns: 1fr 1fr; }
+  .report-layout .stat-total.p-card { grid-column: 1 / -1; }
   .stat-total.p-card { grid-column: auto; }
 
   .settings-layout {

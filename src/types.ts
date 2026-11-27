@@ -1,4 +1,4 @@
-export type PaymentMethod = 'cash' | 'pix' | 'card'
+export type PaymentMethod = 'cash' | 'pix' | 'card' | 'fiado'
 
 export type ItemStatus = 'open' | 'paid' | 'cancelled'
 
@@ -50,7 +50,21 @@ export interface Payment {
   method: PaymentMethod
   itemIds: string[]
   payerName: string
+  debtId: string
   createdAt: number
+}
+
+export interface Debt {
+  id: string
+  personName: string
+  comandaId: string
+  tableName: string
+  detail: string
+  originalCents: number
+  remainingCents: number
+  status: 'open' | 'paid'
+  createdAt: number
+  paidAt: number | null
 }
 
 export interface StockMovement {
@@ -103,6 +117,8 @@ export interface BackupFile {
   audits: AuditEntry[]
   sessions: CashSession[]
   drops: CashDrop[]
+  debts: Debt[]
+  monthGoalCents: number | null
 }
 
 export interface ProductDraft {

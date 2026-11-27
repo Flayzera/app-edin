@@ -10,6 +10,7 @@ defineProps<{
   openItems: ComandaItem[]
   paidItems: ComandaItem[]
   cancelledItems: ComandaItem[]
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -33,7 +34,7 @@ const showCancelled = ref(false)
           <strong>{{ formatCents(item.unitPriceCents * item.qty) }}</strong>
         </div>
         <p class="muted">{{ item.qty > 1 ? `${formatCents(item.unitPriceCents)} cada` : formatCents(item.unitPriceCents) }}</p>
-        <div class="stepper">
+        <div v-if="!readonly" class="stepper">
           <Button icon="pi pi-minus" rounded text severity="secondary" :aria-label="`Diminuir ${item.name}`" @click="emit('decrease', item.id)" />
           <span>{{ item.qty }}</span>
           <Button icon="pi pi-plus" rounded text :aria-label="`Aumentar ${item.name}`" @click="emit('increase', item.id)" />

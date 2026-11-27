@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { AuditEntry, BarTable, CashDrop, CashSession, Comanda, ComandaItem, Meta, Payment, Product, StockMovement } from './types'
+import type { AuditEntry, BarTable, CashDrop, CashSession, Comanda, ComandaItem, Debt, Meta, Payment, Product, StockMovement } from './types'
 
 export class BarDatabase extends Dexie {
   products!: Table<Product, string>
@@ -12,6 +12,7 @@ export class BarDatabase extends Dexie {
   audits!: Table<AuditEntry, string>
   sessions!: Table<CashSession, string>
   drops!: Table<CashDrop, string>
+  debts!: Table<Debt, string>
 
   constructor() {
     super('balcao')
@@ -31,6 +32,13 @@ export class BarDatabase extends Dexie {
       audits: 'id, createdAt',
       sessions: 'id, status, openedAt',
       drops: 'id, sessionId, createdAt',
+    })
+    this.version(4).stores({
+      ...stores,
+      audits: 'id, createdAt',
+      sessions: 'id, status, openedAt',
+      drops: 'id, sessionId, createdAt',
+      debts: 'id, status, createdAt',
     })
   }
 }

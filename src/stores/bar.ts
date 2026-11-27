@@ -11,6 +11,7 @@ import type {
   CashSession,
   Comanda,
   ComandaItem,
+  Debt,
   ItemSelection,
   ItemStatus,
   Payment,
@@ -20,9 +21,17 @@ import type {
   StockMovement,
 } from '../types'
 
+export interface ConfirmLine {
+  label: string
+  value: string
+  strong?: boolean
+}
+
 export interface ConfirmState {
   title: string
   body: string
+  lines: ConfirmLine[]
+  note: string
   confirmLabel: string
 }
 
@@ -45,11 +54,16 @@ export const useBarStore = defineStore('bar', () => {
   const audits = ref<AuditEntry[]>([])
   const sessions = ref<CashSession[]>([])
   const drops = ref<CashDrop[]>([])
+  const debts = ref<Debt[]>([])
+  const monthGoalCents = ref<number | null>(null)
 
   let noticeTimer = 0
   let resolver: ((value: boolean) => void) | null = null
 
   const openSession = computed(() => sessions.value.find((session) => session.status === 'open') ?? null)
+  const openDebts = computed(() =>
+    debts.value.filter((debt) => debt.status === 'open').sort((a, b) => a.createdAt - b.createdAt),
+  )
 
   const lowStockProducts = computed(() =>
     products.value.filter(
@@ -73,11 +87,22 @@ export const useBarStore = defineStore('bar', () => {
     window.clearTimeout(noticeTimer)
   }
 
-  function ask(title: string, body: string, confirmLabel = 'Confirmar') {
+  function ask(
+    title: string,
+    body: string,
+    confirmLabel = 'Confirmar',
+    details?: { lines?: ConfirmLine[]; note?: string },
+  ) {
     if (resolver) resolver(false)
     return new Promise<boolean>((resolve) => {
       resolver = resolve
-      dialog.value = { title, body, confirmLabel }
+      dialog.value = {
+        title,
+        body,
+        lines: details?.lines ?? [],
+        note: details?.note ?? '',
+        confirmLabel,
+      }
     })
   }
 
@@ -89,7 +114,7 @@ export const useBarStore = defineStore('bar', () => {
   }
 
   async function reload() {
-    const [productRows, tableRows, comandaRows, itemRows, paymentRows, movementRows, auditRows, sessionRows, dropRows] = await Promise.all([
+    const [productRows, tableRows, comandaRows, itemRows, paymentRows, movementRows, auditRows, sessionRows, dropRows, debtRows, goalRow] = await Promise.all([
       db.products.toArray(),
       db.mesas.toArray(),
       db.comandas.toArray(),
@@ -99,6 +124,8 @@ export const useBarStore = defineStore('bar', () => {
       db.audits.toArray(),
       db.sessions.toArray(),
       db.drops.toArray(),
+      db.debts.toArray(),
+      db.meta.get('monthGoalCents'),
     ])
     products.value = productRows.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
     tables.value = tableRows.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'pt-BR'))
@@ -107,11 +134,30 @@ export const useBarStore = defineStore('bar', () => {
     payments.value = paymentRows.map((payment) => ({
       ...payment,
       payerName: typeof payment.payerName === 'string' ? payment.payerName : '',
+      debtId: typeof payment.debtId === 'string' ? payment.debtId : '',
     }))
     movements.value = movementRows
     audits.value = auditRows.sort((a, b) => b.createdAt - a.createdAt)
     sessions.value = sessionRows.sort((a, b) => b.openedAt - a.openedAt)
     drops.value = dropRows.sort((a, b) => b.createdAt - a.createdAt)
+    debts.value = debtRows.sort((a, b) => b.createdAt - a.createdAt)
+    const goal = goalRow ? Number(goalRow.value) : null
+    monthGoalCents.value = goal !== null && Number.isInteger(goal) && goal > 0 ? goal : null
+  }
+
+  async function setMonthGoal(cents: number | null) {
+    if (cents !== null && (!Number.isInteger(cents) || cents < 1 || cents > 100_000_000)) {
+      flash('Digite a meta com até duas casas. Ex.: 8000,00')
+      return false
+    }
+    const saved = await run(async () => {
+      if (cents === null) await db.meta.delete('monthGoalCents')
+      else await db.meta.put({ key: 'monthGoalCents', value: String(cents) })
+      await record('Meta', cents === null ? 'Tirou a meta mensal.' : `Definiu a meta mensal em ${formatCents(cents)}.`)
+      await reload()
+    })
+    if (saved) flash(cents === null ? 'Meta removida.' : 'Meta salva.')
+    return saved
   }
 
   function cashPosition(session: CashSession) {
@@ -195,7 +241,7 @@ export const useBarStore = defineStore('bar', () => {
   function dueOf(comandaId: string) {
     const openSum = itemsOf(comandaId, 'open').reduce((sum, item) => sum + item.unitPriceCents * item.qty, 0)
     const loose = payments.value
-      .filter((payment) => payment.comandaId === comandaId && payment.itemIds.length === 0)
+      .filter((payment) => payment.comandaId === comandaId && payment.itemIds.length === 0 && !payment.debtId)
       .reduce((sum, payment) => sum + payment.amountCents, 0)
     return openSum - loose
   }
@@ -208,7 +254,7 @@ export const useBarStore = defineStore('bar', () => {
 
   function paidOf(comandaId: string) {
     return payments.value
-      .filter((payment) => payment.comandaId === comandaId)
+      .filter((payment) => payment.comandaId === comandaId && !payment.debtId)
       .reduce((sum, payment) => sum + payment.amountCents, 0)
   }
 
@@ -390,11 +436,16 @@ export const useBarStore = defineStore('bar', () => {
     })
   }
 
-  async function payItems(comandaId: string, selections: ItemSelection[], method: PaymentMethod) {
+  async function payItems(comandaId: string, selections: ItemSelection[], method: PaymentMethod, payerName = '') {
     const comanda = comandas.value.find((row) => row.id === comandaId && row.status === 'open')
     if (!comanda) return 'failed' as const
     if (!openSession.value) {
       flash('Abra o caixa antes de receber.')
+      return 'failed' as const
+    }
+    const who = payerName.trim()
+    if (!who || who.length > 40) {
+      flash(method === 'fiado' ? 'Diga quem ficou devendo.' : 'Diga quem pagou.')
       return 'failed' as const
     }
     if (selections.length === 0) {
@@ -427,7 +478,7 @@ export const useBarStore = defineStore('bar', () => {
     const outcome: { value: 'partial' | 'closed' } = { value: 'partial' }
     const saved = await run(async () => {
       let closed = false
-      await db.transaction('rw', db.items, db.payments, db.comandas, db.mesas, async () => {
+      await db.transaction('rw', db.items, db.payments, db.debts, db.comandas, db.mesas, async () => {
         const paidIds: string[] = []
         for (const split of splits) {
           if (split.qty === split.item.qty) {
@@ -449,26 +500,49 @@ export const useBarStore = defineStore('bar', () => {
             paidIds.push(paidId)
           }
         }
+        const createdAt = Date.now()
         await db.payments.add({
           id: uid(),
           comandaId,
           amountCents: amount,
           method,
           itemIds: paidIds,
-          payerName: '',
-          createdAt: Date.now(),
+          payerName: who,
+          debtId: '',
+          createdAt,
         })
+        if (method === 'fiado') {
+          const namesForDebt = splits.map((split) => `${split.qty} × ${split.item.name}`).join(', ')
+          await db.debts.add({
+            id: uid(),
+            personName: who,
+            comandaId,
+            tableName,
+            detail: namesForDebt.slice(0, 160),
+            originalCents: amount,
+            remainingCents: amount,
+            status: 'open',
+            createdAt,
+            paidAt: null,
+          })
+        }
         closed = await settle(comandaId, comanda.tableId, tableName, shouldClose)
       })
       const names = splits.map((split) => `${split.qty} × ${split.item.name}`).join(', ')
       const rest = closed ? 'A mesa fechou.' : `Ainda ficou ${formatCents(dueOf(comandaId) - amount)} em aberto.`
-      await record('Pagamento', `Recebeu ${formatCents(amount)} em ${methodLabel[method].toLowerCase()} na mesa ${tableName}. Itens: ${names}. ${rest}`)
-      if (closed) await record('Mesa fechada', `${tableName} saiu da lista depois do pagamento de ${formatCents(amount)} em ${methodLabel[method].toLowerCase()}.`)
+      if (method === 'fiado') {
+        await record('Fiado', `Anotou ${formatCents(amount)} no fiado de ${who} na mesa ${tableName}. ${names}. Não entrou no caixa.`)
+        if (closed) await record('Mesa fechada', `${tableName} saiu da lista com ${formatCents(amount)} no fiado de ${who}.`)
+      } else {
+        await record('Pagamento', `Recebeu ${formatCents(amount)} em ${methodLabel[method].toLowerCase()} de ${who} na mesa ${tableName}. Itens: ${names}. ${rest}`)
+        if (closed) await record('Mesa fechada', `${tableName} saiu da lista depois do pagamento de ${formatCents(amount)} em ${methodLabel[method].toLowerCase()}, feito por ${who}.`)
+      }
       await reload()
       outcome.value = closed ? 'closed' : 'partial'
     })
     if (!saved) return 'failed' as const
-    flash(outcome.value === 'closed' ? `${tableName} fechada.` : 'Pagamento registrado.')
+    if (method === 'fiado') flash(outcome.value === 'closed' ? `${tableName} fechada. Fiado de ${who}.` : `Fiado de ${who} anotado.`)
+    else flash(outcome.value === 'closed' ? `${tableName} fechada.` : `${who} pagou ${tableName}.`)
     return outcome.value
   }
 
@@ -481,7 +555,7 @@ export const useBarStore = defineStore('bar', () => {
     }
     const who = payerName.trim()
     if (!who || who.length > 40) {
-      flash('Diga quem pagou.')
+      flash(method === 'fiado' ? 'Diga quem ficou devendo.' : 'Diga quem pagou.')
       return 'failed' as const
     }
     const due = dueOf(comandaId)
@@ -494,7 +568,8 @@ export const useBarStore = defineStore('bar', () => {
     const outcome: { value: 'partial' | 'closed' } = { value: 'partial' }
     const saved = await run(async () => {
       let closed = false
-      await db.transaction('rw', db.payments, db.items, db.comandas, db.mesas, async () => {
+      await db.transaction('rw', db.payments, db.items, db.debts, db.comandas, db.mesas, async () => {
+        const createdAt = Date.now()
         await db.payments.add({
           id: uid(),
           comandaId,
@@ -502,19 +577,82 @@ export const useBarStore = defineStore('bar', () => {
           method,
           itemIds: [],
           payerName: who,
-          createdAt: Date.now(),
+          debtId: '',
+          createdAt,
         })
+        if (method === 'fiado') {
+          await db.debts.add({
+            id: uid(),
+            personName: who,
+            comandaId,
+            tableName,
+            detail: 'Valor',
+            originalCents: amountCents,
+            remainingCents: amountCents,
+            status: 'open',
+            createdAt,
+            paidAt: null,
+          })
+        }
         closed = await settle(comandaId, comanda.tableId, tableName, shouldClose)
       })
       const rest = closed ? 'A mesa fechou.' : `Ainda ficou ${formatCents(due - amountCents)} em aberto.`
-      await record('Pagamento', `Recebeu ${formatCents(amountCents)} em ${methodLabel[method].toLowerCase()} de ${who} na mesa ${tableName}. ${rest}`)
-      if (closed) await record('Mesa fechada', `${tableName} saiu da lista depois do pagamento de ${formatCents(amountCents)} em ${methodLabel[method].toLowerCase()}, feito por ${who}.`)
+      if (method === 'fiado') {
+        await record('Fiado', `Anotou ${formatCents(amountCents)} no fiado de ${who} na mesa ${tableName}. Não entrou no caixa. ${rest}`)
+        if (closed) await record('Mesa fechada', `${tableName} saiu da lista com ${formatCents(amountCents)} no fiado de ${who}.`)
+      } else {
+        await record('Pagamento', `Recebeu ${formatCents(amountCents)} em ${methodLabel[method].toLowerCase()} de ${who} na mesa ${tableName}. ${rest}`)
+        if (closed) await record('Mesa fechada', `${tableName} saiu da lista depois do pagamento de ${formatCents(amountCents)} em ${methodLabel[method].toLowerCase()}, feito por ${who}.`)
+      }
       await reload()
       outcome.value = closed ? 'closed' : 'partial'
     })
     if (!saved) return 'failed' as const
-    flash(outcome.value === 'closed' ? `${tableName} fechada.` : `${who} pagou ${tableName}.`)
+    if (method === 'fiado') flash(outcome.value === 'closed' ? `${tableName} fechada. Fiado de ${who}.` : `Fiado de ${who} anotado.`)
+    else flash(outcome.value === 'closed' ? `${tableName} fechada.` : `${who} pagou ${tableName}.`)
     return outcome.value
+  }
+
+  async function payDebt(debtId: string, amountCents: number, method: Exclude<PaymentMethod, 'fiado'>) {
+    const debt = debts.value.find((row) => row.id === debtId && row.status === 'open')
+    if (!debt) {
+      flash('Esse fiado já foi quitado.')
+      return false
+    }
+    if (!openSession.value) {
+      flash('Abra o caixa antes de receber.')
+      return false
+    }
+    if (!Number.isInteger(amountCents) || amountCents < 1 || amountCents > debt.remainingCents) {
+      flash(`Informe um valor até ${formatCents(debt.remainingCents)}.`)
+      return false
+    }
+    const saved = await run(async () => {
+      const left = debt.remainingCents - amountCents
+      const paidAt = Date.now()
+      await db.transaction('rw', db.payments, db.debts, async () => {
+        await db.payments.add({
+          id: uid(),
+          comandaId: debt.comandaId,
+          amountCents,
+          method,
+          itemIds: [],
+          payerName: debt.personName,
+          debtId: debt.id,
+          createdAt: paidAt,
+        })
+        await db.debts.update(debt.id, {
+          remainingCents: left,
+          status: left === 0 ? 'paid' : 'open',
+          paidAt: left === 0 ? paidAt : null,
+        })
+      })
+      const rest = left === 0 ? 'O fiado foi quitado.' : `Ainda ficou ${formatCents(left)}.`
+      await record('Fiado recebido', `${debt.personName} pagou ${formatCents(amountCents)} em ${methodLabel[method].toLowerCase()} do fiado da mesa ${debt.tableName}. ${rest}`)
+      await reload()
+    })
+    if (saved) flash(`${debt.personName} pagou ${formatCents(amountCents)}.`)
+    return saved
   }
 
   async function closeComanda(comandaId: string) {
@@ -719,8 +857,13 @@ export const useBarStore = defineStore('bar', () => {
     return saved
   }
 
-  function exportBackup() {
-    const payload = {
+  function backupFileName(date = new Date()) {
+    const part = (value: number) => String(value).padStart(2, '0')
+    return `balcao-${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}-${part(date.getHours())}-${part(date.getMinutes())}-${part(date.getSeconds())}.json`
+  }
+
+  function backupPayload() {
+    return {
       version: 1 as const,
       exportedAt: new Date().toISOString(),
       products: products.value,
@@ -732,15 +875,30 @@ export const useBarStore = defineStore('bar', () => {
       audits: audits.value,
       sessions: sessions.value,
       drops: drops.value,
+      debts: debts.value,
+      monthGoalCents: monthGoalCents.value,
     }
+  }
+
+  function downloadBackup(patch?: { sessions?: CashSession[]; audits?: AuditEntry[] }, when = new Date()) {
+    const payload = backupPayload()
+    if (patch?.sessions) payload.sessions = patch.sessions
+    if (patch?.audits?.length) payload.audits = [...patch.audits, ...payload.audits]
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `balcao-${new Date().toISOString().slice(0, 10)}.json`
+    link.download = backupFileName(when)
+    document.body.appendChild(link)
     link.click()
+    link.remove()
     URL.revokeObjectURL(url)
-    void record('Backup exportado', `Baixou o JSON com ${products.value.length} produtos, ${payments.value.length} pagamentos e ${sessions.value.length} caixas.`).then(() => reload())
+    return link.download
+  }
+
+  function exportBackup() {
+    const fileName = downloadBackup()
+    void record('Backup exportado', `Baixou ${fileName} com ${products.value.length} produtos, ${payments.value.length} pagamentos, ${sessions.value.length} caixas e ${openDebts.value.length} fiados.`).then(() => reload())
     flash('Backup baixado.')
   }
 
@@ -762,7 +920,7 @@ export const useBarStore = defineStore('bar', () => {
       return false
     }
     const saved = await run(async () => {
-      await db.transaction('rw', [db.products, db.mesas, db.comandas, db.items, db.payments, db.movements, db.audits, db.sessions, db.drops, db.meta], async () => {
+      await db.transaction('rw', [db.products, db.mesas, db.comandas, db.items, db.payments, db.movements, db.audits, db.sessions, db.drops, db.debts, db.meta], async () => {
         await db.products.clear()
         await db.mesas.clear()
         await db.comandas.clear()
@@ -772,6 +930,7 @@ export const useBarStore = defineStore('bar', () => {
         await db.audits.clear()
         await db.sessions.clear()
         await db.drops.clear()
+        await db.debts.clear()
         if (backup.products.length) await db.products.bulkAdd(backup.products)
         if (backup.tables.length) await db.mesas.bulkAdd(backup.tables)
         if (backup.comandas.length) await db.comandas.bulkAdd(backup.comandas)
@@ -781,10 +940,13 @@ export const useBarStore = defineStore('bar', () => {
         if (backup.audits.length) await db.audits.bulkAdd(backup.audits)
         if (backup.sessions.length) await db.sessions.bulkAdd(backup.sessions)
         if (backup.drops.length) await db.drops.bulkAdd(backup.drops)
+        if (backup.debts.length) await db.debts.bulkAdd(backup.debts)
         await db.meta.put({ key: 'initialized', value: '1' })
+        if (backup.monthGoalCents) await db.meta.put({ key: 'monthGoalCents', value: String(backup.monthGoalCents) })
+        else await db.meta.delete('monthGoalCents')
       })
       await tidy()
-      await record('Backup importado', `Substituiu os dados deste celular por ${backup.products.length} produtos, ${backup.payments.length} pagamentos e ${backup.sessions.length} caixas.`)
+      await record('Backup importado', `Substituiu os dados deste celular por ${backup.products.length} produtos, ${backup.payments.length} pagamentos, ${backup.sessions.length} caixas e ${backup.debts.length} fiados.`)
       await reload()
     })
     if (saved) flash('Backup restaurado.')
@@ -855,20 +1017,38 @@ export const useBarStore = defineStore('bar', () => {
       return false
     }
     const position = cashPosition(session)
+    const closedAt = Date.now()
+    const closeDetail = `Fechou o caixa. Na gaveta: ${formatCents(position.drawer)}. Dinheiro ${formatCents(position.cash)}, Pix ${formatCents(position.pix)}, cartão ${formatCents(position.card)}, sangrias ${formatCents(position.sangria)}.`
+    const when = new Date(closedAt)
+    const fileName = backupFileName(when)
+    const backupDetail = `Fechamento baixou ${fileName} com ${products.value.length} produtos, ${payments.value.length} pagamentos, ${sessions.value.length} caixas e ${openDebts.value.length} fiados.`
+    const closeAudit: AuditEntry = { id: uid(), createdAt: closedAt, action: 'Caixa fechado', detail: closeDetail.slice(0, 160) }
+    const backupAudit: AuditEntry = { id: uid(), createdAt: closedAt + 1, action: 'Backup exportado', detail: backupDetail.slice(0, 160) }
+    downloadBackup({
+      sessions: sessions.value.map((row) =>
+        row.id === session.id ? { ...session, status: 'closed', closedAt, closingExpectedCents: position.drawer } : row,
+      ),
+      audits: [backupAudit, closeAudit],
+    }, when)
     const saved = await run(async () => {
-      await db.sessions.update(session.id, {
-        status: 'closed',
-        closedAt: Date.now(),
-        closingExpectedCents: position.drawer,
+      await db.transaction('rw', db.sessions, db.audits, async () => {
+        await db.sessions.update(session.id, {
+          status: 'closed',
+          closedAt,
+          closingExpectedCents: position.drawer,
+        })
+        await db.audits.bulkAdd([closeAudit, backupAudit])
       })
-      await record(
-        'Caixa fechado',
-        `Fechou o caixa. Na gaveta: ${formatCents(position.drawer)}. Dinheiro ${formatCents(position.cash)}, Pix ${formatCents(position.pix)}, cartão ${formatCents(position.card)}, sangrias ${formatCents(position.sangria)}.`,
-      )
+      const count = await db.audits.count()
+      if (count > 400) {
+        const extra = await db.audits.orderBy('createdAt').limit(count - 300).primaryKeys()
+        if (extra.length) await db.audits.bulkDelete(extra)
+      }
       await reload()
     })
-    if (saved) flash('Caixa fechado.')
-    return saved
+    if (!saved) return false
+    flash('Caixa fechado. Backup baixado.')
+    return true
   }
 
   return {
@@ -885,6 +1065,9 @@ export const useBarStore = defineStore('bar', () => {
     audits,
     sessions,
     drops,
+    debts,
+    monthGoalCents,
+    openDebts,
     openSession,
     lowStockProducts,
     flash,
@@ -907,6 +1090,7 @@ export const useBarStore = defineStore('bar', () => {
     changeItemQty,
     payItems,
     payAmount,
+    payDebt,
     closeComanda,
     saveProduct,
     setProductActive,
@@ -919,5 +1103,6 @@ export const useBarStore = defineStore('bar', () => {
     openCashier,
     dropCash,
     closeCashier,
+    setMonthGoal,
   }
 })
