@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import Button from 'primevue/button'
-import Card from 'primevue/card'
 import FloatLabel from 'primevue/floatlabel'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -38,19 +37,34 @@ async function receive(method: Exclude<PaymentMethod, 'fiado'>) {
 </script>
 
 <template>
-  <section v-if="bar.openDebts.length" class="debt-list">
+  <section v-if="bar.openDebts.length">
     <p class="section-label">A receber</p>
     <Message v-if="!bar.openSession" severity="warn" :closable="false">Abra o caixa antes de receber um fiado.</Message>
-    <Card v-for="debt in bar.openDebts" :key="debt.id">
-      <template #content>
-        <div class="row-between">
+    <div class="sheet-table">
+      <div class="sheet-head">
+        <span>Pessoa</span>
+        <span>Valor</span>
+        <span></span>
+      </div>
+      <div v-for="debt in bar.openDebts" :key="debt.id" class="sheet-row" :class="{ 'is-open': receivingId === debt.id }">
+        <div class="sheet-who">
           <strong>{{ debt.personName }}</strong>
-          <span>{{ debt.remainingCents === debt.originalCents ? formatCents(debt.remainingCents) : `${formatCents(debt.remainingCents)} de ${formatCents(debt.originalCents)}` }}</span>
+          <p class="movement">{{ debt.tableName }} · {{ formatDateTime(debt.createdAt) }}</p>
+          <p v-if="debt.detail" class="hint">{{ debt.detail }}</p>
         </div>
-        <p class="movement">{{ debt.tableName }} · {{ formatDateTime(debt.createdAt) }}</p>
-        <p v-if="debt.detail" class="hint">{{ debt.detail }}</p>
-        <template v-if="receivingId === debt.id">
-          <FloatLabel variant="on" class="field" style="margin-top: 0.75rem">
+        <strong class="sheet-money">
+          {{ debt.remainingCents === debt.originalCents ? formatCents(debt.remainingCents) : `${formatCents(debt.remainingCents)} de ${formatCents(debt.originalCents)}` }}
+        </strong>
+        <Button
+          v-if="receivingId !== debt.id"
+          label="Receber"
+          text
+          :disabled="!bar.openSession"
+          @click="start(debt.id, debt.remainingCents)"
+        />
+        <Button v-else label="Fechar" severity="secondary" text @click="receivingId = null" />
+        <div v-if="receivingId === debt.id" class="sheet-receive">
+          <FloatLabel variant="on" class="field">
             <InputText :id="`debt-${debt.id}`" v-model="amountText" inputmode="decimal" autocomplete="off" />
             <label :for="`debt-${debt.id}`">Valor recebido</label>
           </FloatLabel>
@@ -59,10 +73,8 @@ async function receive(method: Exclude<PaymentMethod, 'fiado'>) {
             <Button label="Pix" severity="success" :disabled="bar.busy || !bar.openSession" @click="receive('pix')" />
             <Button label="Cartão" severity="info" :disabled="bar.busy || !bar.openSession" @click="receive('card')" />
           </div>
-          <Button class="wide-btn" style="margin-top: 0.5rem" label="Cancelar" severity="secondary" text @click="receivingId = null" />
-        </template>
-        <Button v-else class="wide-btn" style="margin-top: 0.75rem" label="Receber" icon="pi pi-wallet" :disabled="!bar.openSession" @click="start(debt.id, debt.remainingCents)" />
-      </template>
-    </Card>
+        </div>
+      </div>
+    </div>
   </section>
 </template>

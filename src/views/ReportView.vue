@@ -59,7 +59,6 @@ const fiadoPeople = computed(() => {
   }
   return [...grouped.values()].sort((a, b) => b.cents - a.cents || a.name.localeCompare(b.name, 'pt-BR'))
 })
-const maxFiado = computed(() => Math.max(1, ...fiadoPeople.value.map((person) => person.cents)))
 const monthName = computed(() => formatPeriod('month', anchor.value))
 const monthReceived = computed(() =>
   kind.value === 'month'
@@ -218,17 +217,17 @@ async function clearGoal() {
         <Message v-if="fiadoPeople.length === 0" severity="secondary" :closable="false" icon="pi pi-book">
           Ninguém está devendo.
         </Message>
-        <div v-else class="list">
-          <Card v-for="person in fiadoPeople" :key="person.name">
-            <template #content>
-              <div class="row-between">
-                <strong>{{ person.name }}</strong>
-                <span>{{ formatCents(person.cents) }}</span>
-              </div>
-              <span class="day-track goal-track"><span :style="{ width: `${Math.round((person.cents / maxFiado) * 100)}%` }" /></span>
-              <p class="movement">{{ person.count === 1 ? '1 conta em aberto' : `${person.count} contas em aberto` }}</p>
-            </template>
-          </Card>
+        <div v-else class="sheet-table">
+          <div class="sheet-head cols-3">
+            <span>Pessoa</span>
+            <span>Contas</span>
+            <span>Valor</span>
+          </div>
+          <div v-for="person in fiadoPeople" :key="person.name" class="sheet-row cols-3">
+            <strong>{{ person.name }}</strong>
+            <span>{{ person.count }}</span>
+            <strong class="sheet-money">{{ formatCents(person.cents) }}</strong>
+          </div>
         </div>
 
         <p class="section-label">Mesas</p>

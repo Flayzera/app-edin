@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
+import QtyStepper from './QtyStepper.vue'
 import Message from 'primevue/message'
 import { formatCents } from '../money'
 import type { ComandaItem } from '../types'
@@ -13,10 +14,7 @@ defineProps<{
   readonly?: boolean
 }>()
 
-const emit = defineEmits<{
-  increase: [id: string]
-  decrease: [id: string]
-}>()
+const emit = defineEmits<{ set: [id: string, qty: number] }>()
 
 const showCancelled = ref(false)
 </script>
@@ -34,11 +32,14 @@ const showCancelled = ref(false)
           <strong>{{ formatCents(item.unitPriceCents * item.qty) }}</strong>
         </div>
         <p class="muted">{{ item.qty > 1 ? `${formatCents(item.unitPriceCents)} cada` : formatCents(item.unitPriceCents) }}</p>
-        <div v-if="!readonly" class="stepper">
-          <Button icon="pi pi-minus" rounded text severity="secondary" :aria-label="`Diminuir ${item.name}`" @click="emit('decrease', item.id)" />
-          <span>{{ item.qty }}</span>
-          <Button icon="pi pi-plus" rounded text :aria-label="`Aumentar ${item.name}`" @click="emit('increase', item.id)" />
-        </div>
+        <QtyStepper
+          v-if="!readonly"
+          :model-value="item.qty"
+          :min="0"
+          :max="999"
+          :label="item.name"
+          @update:model-value="emit('set', item.id, $event)"
+        />
       </template>
     </Card>
 

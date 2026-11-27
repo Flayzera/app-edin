@@ -9,6 +9,7 @@ import SelectButton from 'primevue/selectbutton'
 import { useBarStore } from '../stores/bar'
 import { formatCents, parseReais } from '../money'
 import type { PaymentMethod } from '../types'
+import QtyStepper from './QtyStepper.vue'
 import Sheet from './Sheet.vue'
 
 const props = defineProps<{ comandaId: string }>()
@@ -105,10 +106,9 @@ async function submitFiado() {
               </span>
             </span>
           </label>
-          <div v-if="picked[item.id] && item.qty > 1" class="stepper" style="margin-top: 0.5rem">
-            <Button icon="pi pi-minus" rounded text severity="secondary" :disabled="picked[item.id] <= 1" :aria-label="`Pagar menos ${item.name}`" @click="setQty(item.id, picked[item.id] - 1, item.qty)" />
-            <span>{{ picked[item.id] }} de {{ item.qty }}</span>
-            <Button icon="pi pi-plus" rounded text :disabled="picked[item.id] >= item.qty" :aria-label="`Pagar mais ${item.name}`" @click="setQty(item.id, picked[item.id] + 1, item.qty)" />
+          <div v-if="picked[item.id] && item.qty > 1" class="pay-qty">
+            <QtyStepper :model-value="picked[item.id] ?? 1" :min="1" :max="item.qty" :label="item.name" @update:model-value="setQty(item.id, $event, item.qty)" />
+            <span class="muted">de {{ item.qty }}</span>
           </div>
         </div>
       </div>

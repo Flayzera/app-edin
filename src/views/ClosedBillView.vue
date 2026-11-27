@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import Button from 'primevue/button'
 import Card from 'primevue/card'
+import Dialog from 'primevue/dialog'
 import { useBarStore } from '../stores/bar'
 import { formatCents, formatDateTime } from '../money'
 import { methodLabel } from '../labels'
+import BillNote from '../components/BillNote.vue'
 import ItemList from '../components/ItemList.vue'
 
 const route = useRoute()
 const router = useRouter()
 const bar = useBarStore()
+const noteOpen = ref(false)
+
+function printNote() {
+  window.print()
+}
 
 const comandaId = computed(() => String(route.params.comandaId))
 const comanda = computed(() => bar.comandas.find((row) => row.id === comandaId.value) ?? null)
@@ -65,6 +73,16 @@ watch(
         <div class="total-line"><span>Consumo</span><span>{{ formatCents(bar.consumptionOf(comanda.id)) }}</span></div>
         <div class="total-line strong"><span>Pago</span><span class="amount">{{ formatCents(bar.paidOf(comanda.id)) }}</span></div>
       </div>
+      <div class="actions">
+        <Button label="Ver conta" icon="pi pi-receipt" @click="noteOpen = true" />
+      </div>
     </footer>
   </main>
+
+  <Dialog v-if="comanda" v-model:visible="noteOpen" modal header="Conta" :style="{ width: 'min(28rem, calc(100vw - 2rem))' }">
+    <BillNote :comanda="comanda" />
+    <template #footer>
+      <Button class="no-print" label="Imprimir" icon="pi pi-print" severity="secondary" outlined @click="printNote" />
+    </template>
+  </Dialog>
 </template>
